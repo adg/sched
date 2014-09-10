@@ -18,10 +18,10 @@ import (
 
 // These values may be changed to configure the thresholds observed by Check.
 var (
-	OversleepThreshold = 3 * time.Millisecond
+	OversleepThreshold = 10 * time.Microsecond
 	ChanSendThreshold  = 10 * time.Microsecond
-	PingPongThreshold  = 20 * time.Microsecond
-	ChainThreshold     = 400 * time.Microsecond
+	PingPongThreshold  = 10 * time.Microsecond
+	ChainThreshold     = 50 * time.Microsecond
 )
 
 // Warner is anything that can log warnings.
