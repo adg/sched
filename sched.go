@@ -20,7 +20,7 @@ var (
 	OversleepThreshold = 10 * time.Microsecond
 	ChanSendThreshold  = 10 * time.Microsecond
 	PingPongThreshold  = 10 * time.Microsecond
-	ChainThreshold     = 50 * time.Microsecond
+	ChainThreshold     = 100 * time.Microsecond
 )
 
 // Warner is anything that can log warnings.
@@ -89,24 +89,24 @@ var (
 
 func collectSampleLoop() {
 	ticker := time.NewTicker(sampleInterval - testSleep)
-	var bad *sample
+	bad := false
 	for {
 		select {
 		case <-ticker.C:
 			s := collectSample()
-			if overThreshold(s) {
-				bad = &s
+			if overThreshold(&s) {
+				bad = true
 			}
 		case w := <-checkChan:
-			if bad != nil {
-				w.Warningf("Recent sample exceeded threshold.\nLast %v samples:\n%s", historySize, highlightSample(*bad))
-				bad = nil
+			if bad {
+				w.Warningf("Recent sample exceeded threshold.\nLast %v samples:\n%s", historySize, Samples())
+				bad = false
 			}
 		}
 	}
 }
 
-func overThreshold(s sample) bool {
+func overThreshold(s *sample) bool {
 	return s.oversleep > OversleepThreshold ||
 		s.bufSend > ChanSendThreshold ||
 		s.pingPong > PingPongThreshold ||
@@ -150,7 +150,7 @@ func collectSample() sample {
 }
 
 const header = "| " +
-	"Sampled at   | " +
+	"Sampled at | " +
 	"Oversleep  | " +
 	"Chan send  | " +
 	"Ping-pong  | " +
@@ -158,10 +158,6 @@ const header = "| " +
 
 // Samples returns a text table of the last 100 samples.
 func Samples() string {
-	return highlightSample(sample{})
-}
-
-func highlightSample(hl sample) string {
 	defer mu.Unlock()
 	mu.Lock()
 	var buf bytes.Buffer
@@ -178,14 +174,14 @@ func highlightSample(hl sample) string {
 		if s.start.IsZero() {
 			break
 		}
-		hls := ""
-		if *s == hl {
-			hls = " <---"
+		hl := ""
+		if overThreshold(s) {
+			hl = " <---"
 		}
-		fmt.Fprintf(&buf, "| %7.1fs ago | %10v | %10v | %10v | %10v |%s\n",
+		fmt.Fprintf(&buf, "| %5.1fs ago | %10v | %10v | %10v | %10v |%s\n",
 			now.Sub(s.start).Seconds(),
 			s.oversleep, s.bufSend, s.pingPong, s.chain,
-			hls)
+			hl)
 	}
 	return buf.String()
 }
