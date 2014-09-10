@@ -47,7 +47,7 @@ func Check(w Warner) {
 const (
 	sampleInterval   = 1 * time.Second
 	testSleep        = 50 * time.Millisecond
-	historySize      = 500
+	historySize      = 100
 	numChainRoutines = 20
 )
 
@@ -77,17 +77,18 @@ var (
 
 func collectSampleLoop() {
 	ticker := time.NewTicker(sampleInterval - testSleep)
-	bad := false
+	var bad *sample
 	for {
 		select {
 		case <-ticker.C:
-			if overThreshold(collectSample()) {
-				bad = true
+			s := collectSample()
+			if overThreshold(s) {
+				bad = &s
 			}
 		case w := <-checkChan:
-			if bad {
-				w.Warningf("Last sample exceeded threshold.\nLast %v samples:\n%s", historySize, Samples())
-				bad = false
+			if bad != nil {
+				w.Warningf("Recent sample exceeded threshold.\nLast %v samples:\n%s", historySize, highlightSample(*bad))
+				bad = nil
 			}
 		}
 	}
@@ -152,8 +153,12 @@ const header = "| " +
 	"Ping-pong  | " +
 	"Chain      |"
 
-// Samples returns a text table of the last 500 samples.
+// Samples returns a text table of the last 100 samples.
 func Samples() string {
+	return highlightSample(sample{})
+}
+
+func highlightSample(hl sample) string {
 	defer mu.Unlock()
 	mu.Lock()
 	var buf bytes.Buffer
@@ -170,9 +175,14 @@ func Samples() string {
 		if s.start.IsZero() {
 			break
 		}
-		fmt.Fprintf(&buf, "| %7.1fs ago | %10v | %10v | %10v | %10v |\n",
+		hls := ""
+		if *s == hl {
+			hls = " <---"
+		}
+		fmt.Fprintf(&buf, "| %7.1fs ago | %10v | %10v | %10v | %10v |%s\n",
 			now.Sub(s.start).Seconds(),
-			s.oversleep, s.bufSend, s.pingPong, s.chain)
+			s.oversleep, s.bufSend, s.pingPong, s.chain,
+			hls)
 	}
 	return buf.String()
 }
