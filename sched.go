@@ -5,8 +5,7 @@
 // 	- Sending a value from one goroutine to another and back. ("PingPong")
 // 	- How much longer a goroutine takes to wake after its sleep period.
 // 	  ("Oversleep")
-// 	- How long it takes to create 20 goroutines and pass a message through
-// 	  all of them. ("Chain")
+// 	- How long it takes to pass a message through 20 goroutines. ("Chain")
 package sched
 
 import (
@@ -66,13 +65,26 @@ type sample struct {
 }
 
 func init() {
+	head = make(chan bool)
+	tail = head
+	for i := 0; i < numChainRoutines; i++ {
+		ch := make(chan bool)
+		go func(a, b chan bool) {
+			for {
+				b <- <-a
+			}
+		}(tail, ch)
+		tail = ch
+	}
+
 	go channelHelper()
 	go collectSampleLoop()
 }
 
 var (
-	unbufc = make(chan bool)
-	bufc   = make(chan bool, 1)
+	unbufc     = make(chan bool)
+	bufc       = make(chan bool, 1)
+	head, tail chan bool
 )
 
 func collectSampleLoop() {
@@ -124,15 +136,6 @@ func collectSample() sample {
 	t3 := time.Now()
 	s.pingPong = t3.Sub(t2)
 
-	head := make(chan bool)
-	tail := head
-	for i := 0; i < numChainRoutines; i++ {
-		ch := make(chan bool)
-		go func(a, b chan bool) {
-			b <- <-a
-		}(tail, ch)
-		tail = ch
-	}
 	head <- true
 	<-tail
 	s.chain = time.Now().Sub(t3)
