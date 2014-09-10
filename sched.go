@@ -1,4 +1,4 @@
-// Package shed provides a basic mechanism to test the latency of the Go
+// Package sched provides a basic mechanism to test the latency of the Go
 // runtime scheduler. When imported, it periodically performs a series of
 // short benchmarks and records the timings. These include:
 // 	- An unbuffered channel send. ("ChanSend")
