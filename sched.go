@@ -10,7 +10,9 @@ package sched
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -100,10 +102,18 @@ func collectSampleLoop() {
 		case w := <-checkChan:
 			if bad {
 				w.Warningf("Recent sample exceeded threshold.\nLast %v samples:\n%s", historySize, Samples())
+				w.Warningf("Memory statistics:\n%s", memStats())
 				bad = false
 			}
 		}
 	}
+}
+
+func memStats() []byte {
+	var stats runtime.MemStats
+	runtime.ReadMemStats(&stats)
+	b, _ := json.MarshalIndent(stats, "", "  ")
+	return b
 }
 
 func overThreshold(s *sample) bool {
